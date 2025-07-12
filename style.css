@@ -1,65 +1,28 @@
-let currentScene = 0;
-let data = [];
-
-// Load the CSV dataset
-d3.csv("data/car_prices.csv").then(dataset => {
-  data = dataset;
-  preprocess(data);
-  drawScene(currentScene);
-});
-
-// Preprocess data: convert types and assign seasons
-function preprocess(data) {
-  data.forEach(d => {
-    d.Price = +d.Price;
-    d.Year = +d.Year;
-    d.Month = +d.Month;
-    d.Season = getSeason(d.Month);
-  });
+body {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  background-color: #fafafa;
 }
 
-// Determine season from month
-function getSeason(month) {
-  month = +month;
-  if ([12, 1, 2].includes(month)) return "Winter";
-  if ([6, 7, 8].includes(month)) return "Summer";
-  return "Other";
+h1 {
+  font-size: 28px;
 }
 
-// Draw the appropriate scene based on currentScene
-function drawScene(scene) {
-  d3.select("#vis").html(""); // Clear previous content
-
-  if (scene === 0) drawScene0();
-  else if (scene === 1) drawScene1();
-  else if (scene === 2) drawScene2();
-  else if (scene === 3) drawScene3();
+#description {
+  font-size: 18px;
+  margin: 10px 0 20px;
 }
 
-// Button event listeners for navigating scenes
-d3.select("#next").on("click", () => {
-  if (currentScene < 3) currentScene++;
-  drawScene(currentScene);
-});
-
-d3.select("#prev").on("click", () => {
-  if (currentScene > 0) currentScene--;
-  drawScene(currentScene);
-});
-
-// Scene definitions
-function drawScene0() {
-  d3.select("#vis").append("p").text("Scene 0: Overall Price Distribution");
+#controls {
+  margin: 10px 0;
 }
 
-function drawScene1() {
-  d3.select("#vis").append("p").text("Scene 1: Average Price by Year");
+button {
+  margin-right: 10px;
+  padding: 6px 12px;
+  font-size: 14px;
 }
 
-function drawScene2() {
-  d3.select("#vis").append("p").text("Scene 2: Seasonal Price Comparison");
-}
-
-function drawScene3() {
-  d3.select("#vis").append("p").text("Scene 3: Interactive Exploration");
+#vis {
+  margin-top: 20px;
 }
