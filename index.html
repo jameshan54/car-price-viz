@@ -3,20 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Car Price Visualization</title>
-  <link rel="stylesheet" href="style.css"/>
+  <title>Used Car Price Trends</title>
+  <link rel="stylesheet" href="style.css" />
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-  <h1>Car Price Visualization</h1>
+  <header>
+    <h1>Used Car Price Trends</h1>
+  </header>
 
-  <div id="description"></div>
-  <div id="controls">
-    <button id="prev">Previous</button>
-    <button id="next">Next</button>
-  </div>
+  <nav id="navigation">
+    <button onclick="renderScene(0)">Scene 0: Brand Depreciation Trend</button>
+    <button onclick="renderScene(1)">Scene 1: Model Depreciation Trend</button>
+    <button onclick="renderScene(2)">Scene 2: Seasonal Comparison</button>
+    <button onclick="renderScene(3)">Scene 3: Free Exploration</button>
+  </nav>
 
-  <div id="vis"></div>
+  <main>
+    <div id="chart"></div>
+    <div id="annotation"></div>
+  </main>
 
   <script src="script.js"></script>
 </body>
