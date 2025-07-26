@@ -1,133 +1,153 @@
-let data;
+// script.js
 
-d3.csv("data/car_sales_data_final.csv").then(raw => {
-  // Convert numeric fields
-  data = raw.map(d => ({
-    ...d,
-    Sale_Price: +d["Sale Price"],
-    Age: +d["Age"],
-    Month: +d["Month"]
-  }));
+let currentScene = 0;
+let currentView = "brand";
+let carData;
 
-  // Start with Scene 0
-  renderScene(0);
+// Load and clean data
+d3.csv("data/used_cars_cleaned.csv").then(data => {
+  data.forEach(d => {
+    d.price = +d.price;
+  });
+  carData = data.filter(d => d.price > 1000 && d.price < 100000);
+  renderScene(currentScene);
 });
 
-function renderScene(sceneId) {
-  d3.select("#chart").html("");
-  d3.select("#annotation").html("");
-
-  if (sceneId === 0) renderScene0();
-  else if (sceneId === 1) renderScene1();
-  else if (sceneId === 2) renderScene2();
-  else if (sceneId === 3) renderScene3();
+// Scene rendering controller
+function renderScene(scene) {
+  d3.select("#vis").html("");
+  d3.select("#scene-title").text(`Scene ${scene + 1}`);
+  if (scene === 0) drawScene1();
 }
 
-// Scene 0: Brand Depreciation Trend
-function renderScene0() {
-  d3.select("#annotation").text("This chart shows how average car prices vary by brand as vehicle age increases.");
+// Navigation buttons
+d3.select("#prev").on("click", () => {
+  if (currentScene > 0) {
+    currentScene--;
+    currentView = "brand";
+    renderScene(currentScene);
+  }
+});
 
-  const svg = d3.select("#chart")
+d3.select("#next").on("click", () => {
+  if (currentScene < 3) {
+    currentScene++;
+    currentView = "brand";
+    renderScene(currentScene);
+  }
+});
+
+// Scene 1: Average price per brand with color by country group
+function drawScene1() {
+  const svg = d3.select("#vis")
     .append("svg")
-    .attr("width", 800)
-    .attr("height", 500);
+    .attr("width", 960)
+    .attr("height", 600);
 
-  const margin = { top: 50, right: 150, bottom: 60, left: 80 };
-  const width = 800 - margin.left - margin.right;
-  const height = 500 - margin.top - margin.bottom;
+  const margin = { top: 60, right: 250, bottom: 100, left: 70 },
+    width = +svg.attr("width") - margin.left - margin.right,
+    height = +svg.attr("height") - margin.top - margin.bottom;
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // Nest by brand and age
-  const nested = d3.groups(data, d => d["Car Make"], d => d["Age"])
-    .map(([make, ageGroup]) => ({
-      make,
-      values: ageGroup.map(([age, records]) => ({
-        age: +age,
-        avgPrice: d3.mean(records, d => d.Sale_Price)
-      })).sort((a, b) => a.age - b.age)
-    }));
+  const grouped = d3.rollup(
+    carData,
+    v => ({
+      avgPrice: d3.mean(v, d => d.price),
+      count: v.length,
+      country: v[0].brand_group
+    }),
+    d => d.manufacturer
+  );
 
-  const allAges = Array.from(new Set(data.map(d => d.Age))).sort((a, b) => a - b);
+  const data = Array.from(grouped, ([manufacturer, values]) => ({
+    manufacturer,
+    avgPrice: values.avgPrice,
+    count: values.count,
+    country: values.country
+  }));
 
-  const x = d3.scaleLinear()
-    .domain(d3.extent(allAges))
-    .range([0, width]);
+  data.sort((a, b) => a.avgPrice - b.avgPrice);
+
+  const x = d3.scaleBand()
+    .domain(data.map(d => d.manufacturer))
+    .range([0, width])
+    .padding(0.2);
 
   const y = d3.scaleLinear()
-    .domain([d3.min(nested, b => d3.min(b.values, d => d.avgPrice)) * 0.95,
-             d3.max(nested, b => d3.max(b.values, d => d.avgPrice)) * 1.05])
+    .domain([0, d3.max(data, d => d.avgPrice)]).nice()
     .range([height, 0]);
 
   const color = d3.scaleOrdinal()
-    .domain(nested.map(d => d.make))
-    .range(d3.schemeCategory10);
+    .domain(["USA", "Germany", "Japan", "Korea", "UK", "Italy", "Other", "Sweden"])
+    .range(["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#7f7f7f", "#17becf"]);
 
-  const xAxis = d3.axisBottom(x)
-    .ticks(allAges.length)
-    .tickFormat(d => `${d} yrs`);
-  const yAxis = d3.axisLeft(y).tickFormat(d3.format(","));
+  const radius = d3.scaleSqrt()
+    .domain([0, d3.max(data, d => d.count)])
+    .range([4, 20]);
 
   g.append("g")
-    .attr("transform", `translate(0, ${height})`)
-    .call(xAxis);
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x))
+    .selectAll("text")
+    .attr("transform", "rotate(-45)")
+    .style("text-anchor", "end");
 
-  g.append("g").call(yAxis);
+  g.append("g")
+    .call(d3.axisLeft(y).tickFormat(d3.format(",")));
 
   g.append("text")
     .attr("x", width / 2)
-    .attr("y", height + 40)
+    .attr("y", -30)
     .attr("text-anchor", "middle")
-    .text("Car Age");
+    .attr("font-size", "18px")
+    .attr("font-weight", "bold")
+    .text("Average Used Car Price by Brand (Colored by Country Group)");
 
-  g.append("text")
-    .attr("transform", "rotate(-90)")
-    .attr("y", -50)
-    .attr("x", -height / 2)
-    .attr("text-anchor", "middle")
-    .text("Average Price");
+  const tooltip = d3.select("#tooltip");
 
-  const line = d3.line()
-    .x(d => x(d.age))
-    .y(d => y(d.avgPrice));
-
-  g.selectAll(".line")
-    .data(nested)
-    .join("path")
-    .attr("fill", "none")
-    .attr("stroke", d => color(d.make))
-    .attr("stroke-width", 2)
-    .attr("d", d => line(d.values));
+  g.selectAll("circle")
+    .data(data)
+    .enter()
+    .append("circle")
+    .attr("cx", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("cy", d => y(d.avgPrice))
+    .attr("r", d => radius(d.count))
+    .attr("fill", d => color(d.country))
+    .attr("opacity", 0.8)
+    .on("mouseover", function (event, d) {
+      tooltip.transition().style("opacity", 1);
+      tooltip.html(
+        `<strong>${d.manufacturer}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}<br>Listings: ${d.count}<br>Country: ${d.country}`
+      );
+    })
+    .on("mousemove", function (event) {
+      tooltip
+        .style("left", (event.pageX + 15) + "px")
+        .style("top", (event.pageY - 28) + "px");
+    })
+    .on("mouseout", function () {
+      tooltip.transition().style("opacity", 0);
+    });
 
   const legend = svg.append("g")
-    .attr("transform", `translate(${width + margin.left + 20}, ${margin.top})`);
+    .attr("transform", `translate(${width + margin.left + 20},${margin.top})`);
 
-  nested.forEach((d, i) => {
-    legend.append("rect")
-      .attr("x", 0)
-      .attr("y", i * 20)
-      .attr("width", 12)
-      .attr("height", 12)
-      .attr("fill", color(d.make));
+  const countries = color.domain();
+
+  countries.forEach((country, i) => {
+    const yOffset = i * 25;
+    legend.append("circle")
+      .attr("cx", 0)
+      .attr("cy", yOffset)
+      .attr("r", 6)
+      .attr("fill", color(country));
 
     legend.append("text")
-      .attr("x", 18)
-      .attr("y", i * 20 + 10)
-      .text(d.make)
-      .style("font-size", "12px")
-      .attr("alignment-baseline", "middle");
+      .attr("x", 15)
+      .attr("y", yOffset + 5)
+      .text(country)
+      .attr("alignment-baseline", "middle")
+      .attr("font-size", "13px");
   });
-}
-
-// Placeholders for Scenes 1–3
-function renderScene1() {
-  d3.select("#annotation").text("Select a specific model to explore its depreciation trend over time.");
-}
-
-function renderScene2() {
-  d3.select("#annotation").text("Compare average prices in different seasons for cars of the same age.");
-}
-
-function renderScene3() {
-  d3.select("#annotation").text("Use the dropdowns to freely explore trends by brand, model, and year.");
 }
