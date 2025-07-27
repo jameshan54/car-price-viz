@@ -60,16 +60,25 @@ function drawScene1() {
         height = 600 - margin.top - margin.bottom;
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-  const grouped = d3.rollup(carData, v => ({ avgPrice: d3.mean(v, d => d.price), count: v.length, country: v[0].brand_group }), d => d.manufacturer);
-  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values })).sort((a, b) => a.avgPrice - b.avgPrice);
+  const grouped = d3.rollup(carData, v => ({
+    avgPrice: d3.mean(v, d => d.price),
+    count: v.length,
+    country: v[0].brand_group
+  }), d => d.manufacturer);
+
+  const data = Array.from(grouped, ([manufacturer, values]) => ({
+    manufacturer, ...values
+  })).sort((a, b) => a.avgPrice - b.avgPrice);
 
   const x = d3.scaleBand().domain(data.map(d => d.manufacturer)).range([0, width]).padding(0.2);
   const y = d3.scaleLinear().domain([0, d3.max(data, d => d.avgPrice)]).nice().range([height, 0]);
   const radius = d3.scaleSqrt().domain([0, d3.max(data, d => d.count)]).range([4, 20]);
   const tooltip = d3.select("#tooltip");
 
-  g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text")
+  g.append("g").attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x)).selectAll("text")
     .attr("transform", "rotate(-45)").style("text-anchor", "end");
+
   g.append("g").call(d3.axisLeft(y).tickFormat(d3.format(",")));
 
   g.append("text").attr("x", width / 2).attr("y", -30).attr("text-anchor", "middle")
@@ -100,7 +109,60 @@ function drawScene1() {
     legend.append("text").attr("x", 15).attr("y", yOffset + 5).text(country)
       .attr("alignment-baseline", "middle").attr("font-size", "13px");
   });
+
+  const japanTextX = x("mazda");
+  const japanTextY = y(25000);
+
+  g.append("text")
+    .attr("x", japanTextX)
+    .attr("y", japanTextY)
+    .attr("text-anchor", "middle")
+    .attr("fill", "green")
+    .attr("font-size", "13px")
+    .attr("font-weight", "bold")
+    .text("Japanese brands mostly in low-mid price range");
+
+  const germanTextX = x("bmw");
+  const germanTextY = y(8000);
+
+  g.append("text")
+    .attr("x", germanTextX)
+    .attr("y", germanTextY)
+    .attr("text-anchor", "middle")
+    .attr("fill", "red")
+    .attr("font-size", "13px")
+    .attr("font-weight", "bold")
+    .text("German brands span a wide range but tend to be higher priced");
+
+  const japanPoints = data.filter(d => d.country === "Japan");
+  g.selectAll(".japan-line")
+    .data(japanPoints)
+    .enter()
+    .append("line")
+    .attr("class", "japan-line")
+    .attr("x1", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("y1", d => y(d.avgPrice))
+    .attr("x2", japanTextX)
+    .attr("y2", japanTextY)
+    .attr("stroke", "green")
+    .attr("stroke-width", 1)
+    .attr("stroke-opacity", 0.4);
+
+  const germanPoints = data.filter(d => d.country === "Germany");
+  g.selectAll(".german-line")
+    .data(germanPoints)
+    .enter()
+    .append("line")
+    .attr("class", "german-line")
+    .attr("x1", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("y1", d => y(d.avgPrice))
+    .attr("x2", germanTextX)
+    .attr("y2", germanTextY)
+    .attr("stroke", "red")
+    .attr("stroke-width", 1)
+    .attr("stroke-opacity", 0.4);
 }
+
 
 function drawScene2() {
   const svg = createSVG();
@@ -148,6 +210,70 @@ function drawScene2() {
     legend.append("text").attr("x", 15).attr("y", yOffset + 5).text(country)
       .attr("alignment-baseline", "middle").attr("font-size", "13px");
   });
+
+ 
+  const japaneseBrands = ["toyota", "honda", "nissan", "subaru", "lexus", "mitsubishi"];
+  const japanLineY = 7000;
+
+  g.append("text")
+    .attr("x", (x("toyota") + x("mitsubishi")) / 2)
+    .attr("y", y(japanLineY) - 10)
+    .attr("text-anchor", "middle")
+    .attr("fill", "darkgreen")
+    .attr("font-size", "14px")
+    .attr("font-weight", "bold")
+    .text("Japanese brands have high listings");
+
+  g.append("line")
+    .attr("x1", x("toyota") + x.bandwidth() / 2)
+    .attr("x2", x("mitsubishi") + x.bandwidth() / 2)
+    .attr("y1", y(japanLineY))
+    .attr("y2", y(japanLineY))
+    .attr("stroke", "darkgreen")
+    .attr("stroke-width", 1);
+
+  japaneseBrands.forEach(brand => {
+    g.append("line")
+      .attr("x1", x(brand) + x.bandwidth() / 2)
+      .attr("x2", x(brand) + x.bandwidth() / 2)
+      .attr("y1", y(japanLineY))
+      .attr("y2", y(data.find(d => d.manufacturer === brand).count))
+      .attr("stroke", "darkgreen")
+      .attr("stroke-dasharray", "4,3")
+      .attr("stroke-width", 1);
+  });
+
+  const germanBrands = ["bmw", "mercedes-benz", "audi", "volkswagen", "porsche"];
+  const lineY = 5000; // 기존보다 낮춘 높이
+
+  g.append("text")
+    .attr("x", (x("bmw") + x("porsche")) / 2)
+    .attr("y", y(lineY) - 10) // 이 부분이 핵심
+    .attr("text-anchor", "middle")
+    .attr("fill", "firebrick")
+    .attr("font-size", "14px")
+    .attr("font-weight", "bold")
+    .text("German brands have moderate listings");
+
+  g.append("line")
+    .attr("x1", x("bmw") + x.bandwidth() / 2)
+    .attr("x2", x("porsche") + x.bandwidth() / 2)
+    .attr("y1", y(lineY))
+    .attr("y2", y(lineY))
+    .attr("stroke", "firebrick")
+    .attr("stroke-width", 1);
+
+  germanBrands.forEach(brand => {
+  g.append("line")
+    .attr("x1", x(brand) + x.bandwidth() / 2)
+    .attr("x2", x(brand) + x.bandwidth() / 2)
+    .attr("y1", y(lineY))      .attr("y2", y(data.find(d => d.manufacturer === brand).count))
+    .attr("stroke", "firebrick")
+    .attr("stroke-dasharray", "4,3")
+    .attr("stroke-width", 1);
+  });
+
+
 }
 
 function drawScene3() {
