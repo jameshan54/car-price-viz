@@ -25,7 +25,6 @@ function renderScene(scene) {
   else if (scene === 3) drawScene4();
 }
 
-
 // Navigation buttons
 d3.select("#prev").on("click", () => {
   if (currentScene > 0) {
@@ -35,7 +34,7 @@ d3.select("#prev").on("click", () => {
 });
 
 d3.select("#next").on("click", () => {
-  if (currentScene < 3) {  // ✅ 최대 scene 4로 수정
+  if (currentScene < 3) {
     currentScene++;
     renderScene(currentScene);
   }
@@ -45,32 +44,32 @@ const color = d3.scaleOrdinal()
   .domain(["USA", "Germany", "Japan", "Korea", "UK", "Italy", "Other", "Sweden"])
   .range(["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#7f7f7f", "#17becf"]);
 
-// Scene 1: Average price by brand
+function createSVG() {
+  return d3.select("#vis")
+    .append("svg")
+    .attr("width", 960)
+    .attr("height", 600)
+    .style("display", "block")
+    .style("margin", "0 auto");
+}
+
 function drawScene1() {
-  const svg = d3.select("#vis").append("svg").attr("width", 960).attr("height", 600);
+  const svg = createSVG();
   const margin = { top: 60, right: 250, bottom: 100, left: 70 },
         width = 960 - margin.left - margin.right,
         height = 600 - margin.top - margin.bottom;
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-  const grouped = d3.rollup(
-    carData,
-    v => ({ avgPrice: d3.mean(v, d => d.price), count: v.length, country: v[0].brand_group }),
-    d => d.manufacturer
-  );
-
-  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values }))
-    .sort((a, b) => a.avgPrice - b.avgPrice);
+  const grouped = d3.rollup(carData, v => ({ avgPrice: d3.mean(v, d => d.price), count: v.length, country: v[0].brand_group }), d => d.manufacturer);
+  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values })).sort((a, b) => a.avgPrice - b.avgPrice);
 
   const x = d3.scaleBand().domain(data.map(d => d.manufacturer)).range([0, width]).padding(0.2);
   const y = d3.scaleLinear().domain([0, d3.max(data, d => d.avgPrice)]).nice().range([height, 0]);
   const radius = d3.scaleSqrt().domain([0, d3.max(data, d => d.count)]).range([4, 20]);
   const tooltip = d3.select("#tooltip");
 
-  g.append("g").attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x)).selectAll("text")
+  g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text")
     .attr("transform", "rotate(-45)").style("text-anchor", "end");
-
   g.append("g").call(d3.axisLeft(y).tickFormat(d3.format(",")));
 
   g.append("text").attr("x", width / 2).attr("y", -30).attr("text-anchor", "middle")
@@ -103,31 +102,22 @@ function drawScene1() {
   });
 }
 
-// Scene 2: Listing count per brand
 function drawScene2() {
-  const svg = d3.select("#vis").append("svg").attr("width", 960).attr("height", 600);
+  const svg = createSVG();
   const margin = { top: 60, right: 250, bottom: 100, left: 80 },
         width = 960 - margin.left - margin.right,
         height = 600 - margin.top - margin.bottom;
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-  const grouped = d3.rollup(
-    carData,
-    v => ({ count: v.length, country: v[0].brand_group }),
-    d => d.manufacturer
-  );
-
-  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values }))
-    .sort((a, b) => b.count - a.count);
+  const grouped = d3.rollup(carData, v => ({ count: v.length, country: v[0].brand_group }), d => d.manufacturer);
+  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values })).sort((a, b) => b.count - a.count);
 
   const x = d3.scaleBand().domain(data.map(d => d.manufacturer)).range([0, width]).padding(0.2);
   const y = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([height, 0]);
   const tooltip = d3.select("#tooltip");
 
-  g.append("g").attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x)).selectAll("text")
+  g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text")
     .attr("transform", "rotate(-45)").style("text-anchor", "end");
-
   g.append("g").call(d3.axisLeft(y));
 
   g.append("text").attr("x", width / 2).attr("y", -30).attr("text-anchor", "middle")
@@ -160,9 +150,8 @@ function drawScene2() {
   });
 }
 
-// Scene 3: Average price by weekday
 function drawScene3() {
-  const svg = d3.select("#vis").append("svg").attr("width", 960).attr("height", 600);
+  const svg = createSVG();
   const margin = { top: 60, right: 50, bottom: 100, left: 80 },
         width = 960 - margin.left - margin.right,
         height = 600 - margin.top - margin.bottom;
@@ -215,40 +204,27 @@ function drawScene3() {
     .text(d => `$${d3.format(",.0f")(d.avgPrice)}`);
 }
 
-// Scene 4: Listing count by weekday
 function drawScene4() {
-  const svg = d3.select("#vis").append("svg").attr("width", 960).attr("height", 600);
+  const svg = createSVG();
   const margin = { top: 60, right: 50, bottom: 100, left: 80 },
-    width = 960 - margin.left - margin.right,
-    height = 600 - margin.top - margin.bottom;
+        width = 960 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
   const weekdayOrder = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-  const grouped = d3.rollup(
-    carData,
-    v => v.length,
-    d => d.weekday
-  );
-
+  const grouped = d3.rollup(carData, v => v.length, d => d.weekday);
   const data = Array.from(grouped, ([weekday, count]) => ({ weekday, count }))
     .filter(d => weekdayOrder.includes(d.weekday))
     .sort((a, b) => weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday));
 
   const x = d3.scaleBand().domain(weekdayOrder).range([0, width]).padding(0.2);
   const y = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([height, 0]);
-
-  // 색상 스케일 (listing 수량에 따라 색상 진하기 조절)
-  const countExtent = d3.extent(data, d => d.count);
-  const colorScale = d3.scaleLinear().domain(countExtent).range(["#c6dbef", "#08519c"]);
-
+  const colorScale = d3.scaleLinear().domain(d3.extent(data, d => d.count)).range(["#c6dbef", "#08519c"]);
   const tooltip = d3.select("#tooltip");
 
-  // 축
   g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x));
   g.append("g").call(d3.axisLeft(y).tickFormat(d3.format(",")));
 
-  // 제목
   g.append("text")
     .attr("x", width / 2)
     .attr("y", -30)
@@ -257,7 +233,6 @@ function drawScene4() {
     .attr("font-weight", "bold")
     .text("Number of Listings by Weekday");
 
-  // 막대
   g.selectAll("rect")
     .data(data)
     .enter().append("rect")
@@ -275,7 +250,6 @@ function drawScene4() {
     })
     .on("mouseout", () => tooltip.transition().style("opacity", 0));
 
-  // 수치 라벨
   g.selectAll("text.label")
     .data(data)
     .enter().append("text")
@@ -287,3 +261,4 @@ function drawScene4() {
     .attr("fill", "black")
     .text(d => d3.format(",")(d.count));
 }
+
