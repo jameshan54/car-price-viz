@@ -1,7 +1,4 @@
-// script.js
-
 let currentScene = 0;
-let currentView = "brand";
 let carData;
 
 // Load and clean data
@@ -17,137 +14,276 @@ d3.csv("data/used_cars_cleaned.csv").then(data => {
 function renderScene(scene) {
   d3.select("#vis").html("");
   d3.select("#scene-title").text(`Scene ${scene + 1}`);
+
+  // Show/hide navigation buttons
+  d3.select("#prev").style("display", scene === 0 ? "none" : "inline-block");
+  d3.select("#next").style("display", scene === 3 ? "none" : "inline-block");
+
   if (scene === 0) drawScene1();
+  else if (scene === 1) drawScene2();
+  else if (scene === 2) drawScene3();
+  else if (scene === 3) drawScene4();
 }
+
 
 // Navigation buttons
 d3.select("#prev").on("click", () => {
   if (currentScene > 0) {
     currentScene--;
-    currentView = "brand";
     renderScene(currentScene);
   }
 });
 
 d3.select("#next").on("click", () => {
-  if (currentScene < 3) {
+  if (currentScene < 3) {  // ✅ 최대 scene 4로 수정
     currentScene++;
-    currentView = "brand";
     renderScene(currentScene);
   }
 });
 
-// Scene 1: Average price per brand with color by country group
+const color = d3.scaleOrdinal()
+  .domain(["USA", "Germany", "Japan", "Korea", "UK", "Italy", "Other", "Sweden"])
+  .range(["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#7f7f7f", "#17becf"]);
+
+// Scene 1: Average price by brand
 function drawScene1() {
-  const svg = d3.select("#vis")
-    .append("svg")
-    .attr("width", 960)
-    .attr("height", 600);
-
+  const svg = d3.select("#vis").append("svg").attr("width", 960).attr("height", 600);
   const margin = { top: 60, right: 250, bottom: 100, left: 70 },
-    width = +svg.attr("width") - margin.left - margin.right,
-    height = +svg.attr("height") - margin.top - margin.bottom;
-
+        width = 960 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
   const grouped = d3.rollup(
     carData,
-    v => ({
-      avgPrice: d3.mean(v, d => d.price),
-      count: v.length,
-      country: v[0].brand_group
-    }),
+    v => ({ avgPrice: d3.mean(v, d => d.price), count: v.length, country: v[0].brand_group }),
     d => d.manufacturer
   );
 
-  const data = Array.from(grouped, ([manufacturer, values]) => ({
-    manufacturer,
-    avgPrice: values.avgPrice,
-    count: values.count,
-    country: values.country
-  }));
+  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values }))
+    .sort((a, b) => a.avgPrice - b.avgPrice);
 
-  data.sort((a, b) => a.avgPrice - b.avgPrice);
+  const x = d3.scaleBand().domain(data.map(d => d.manufacturer)).range([0, width]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.avgPrice)]).nice().range([height, 0]);
+  const radius = d3.scaleSqrt().domain([0, d3.max(data, d => d.count)]).range([4, 20]);
+  const tooltip = d3.select("#tooltip");
 
-  const x = d3.scaleBand()
-    .domain(data.map(d => d.manufacturer))
-    .range([0, width])
-    .padding(0.2);
+  g.append("g").attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x)).selectAll("text")
+    .attr("transform", "rotate(-45)").style("text-anchor", "end");
 
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(data, d => d.avgPrice)]).nice()
-    .range([height, 0]);
+  g.append("g").call(d3.axisLeft(y).tickFormat(d3.format(",")));
 
-  const color = d3.scaleOrdinal()
-    .domain(["USA", "Germany", "Japan", "Korea", "UK", "Italy", "Other", "Sweden"])
-    .range(["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#7f7f7f", "#17becf"]);
+  g.append("text").attr("x", width / 2).attr("y", -30).attr("text-anchor", "middle")
+    .attr("font-size", "18px").attr("font-weight", "bold")
+    .text("Average Used Car Price by Brand (Colored by Country Group)");
 
-  const radius = d3.scaleSqrt()
-    .domain([0, d3.max(data, d => d.count)])
-    .range([4, 20]);
+  g.selectAll("circle")
+    .data(data)
+    .enter().append("circle")
+    .attr("cx", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("cy", d => y(d.avgPrice))
+    .attr("r", d => radius(d.count))
+    .attr("fill", d => color(d.country))
+    .attr("opacity", 0.8)
+    .on("mouseover", (event, d) => {
+      tooltip.transition().style("opacity", 1);
+      tooltip.html(`<strong>${d.manufacturer}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}<br>Listings: ${d.count}<br>Country: ${d.country}`);
+    })
+    .on("mousemove", event => {
+      tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+    })
+    .on("mouseout", () => tooltip.transition().style("opacity", 0));
 
-  g.append("g")
-    .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x))
-    .selectAll("text")
-    .attr("transform", "rotate(-45)")
-    .style("text-anchor", "end");
+  const legend = svg.append("g").attr("transform", `translate(${width + margin.left + 20},${margin.top})`);
+  color.domain().forEach((country, i) => {
+    const yOffset = i * 25;
+    legend.append("circle").attr("cx", 0).attr("cy", yOffset).attr("r", 6).attr("fill", color(country));
+    legend.append("text").attr("x", 15).attr("y", yOffset + 5).text(country)
+      .attr("alignment-baseline", "middle").attr("font-size", "13px");
+  });
+}
 
-  g.append("g")
-    .call(d3.axisLeft(y).tickFormat(d3.format(",")));
+// Scene 2: Listing count per brand
+function drawScene2() {
+  const svg = d3.select("#vis").append("svg").attr("width", 960).attr("height", 600);
+  const margin = { top: 60, right: 250, bottom: 100, left: 80 },
+        width = 960 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
+  const grouped = d3.rollup(
+    carData,
+    v => ({ count: v.length, country: v[0].brand_group }),
+    d => d.manufacturer
+  );
+
+  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values }))
+    .sort((a, b) => b.count - a.count);
+
+  const x = d3.scaleBand().domain(data.map(d => d.manufacturer)).range([0, width]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([height, 0]);
+  const tooltip = d3.select("#tooltip");
+
+  g.append("g").attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x)).selectAll("text")
+    .attr("transform", "rotate(-45)").style("text-anchor", "end");
+
+  g.append("g").call(d3.axisLeft(y));
+
+  g.append("text").attr("x", width / 2).attr("y", -30).attr("text-anchor", "middle")
+    .attr("font-size", "18px").attr("font-weight", "bold")
+    .text("Number of Listings by Brand (Colored by Country Group)");
+
+  g.selectAll("rect")
+    .data(data)
+    .enter().append("rect")
+    .attr("x", d => x(d.manufacturer))
+    .attr("y", d => y(d.count))
+    .attr("width", x.bandwidth())
+    .attr("height", d => height - y(d.count))
+    .attr("fill", d => color(d.country))
+    .on("mouseover", (event, d) => {
+      tooltip.transition().style("opacity", 1);
+      tooltip.html(`<strong>${d.manufacturer}</strong><br>Listings: ${d.count}<br>Country: ${d.country}`);
+    })
+    .on("mousemove", event => {
+      tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+    })
+    .on("mouseout", () => tooltip.transition().style("opacity", 0));
+
+  const legend = svg.append("g").attr("transform", `translate(${width + margin.left + 20},${margin.top})`);
+  color.domain().forEach((country, i) => {
+    const yOffset = i * 25;
+    legend.append("circle").attr("cx", 0).attr("cy", yOffset).attr("r", 6).attr("fill", color(country));
+    legend.append("text").attr("x", 15).attr("y", yOffset + 5).text(country)
+      .attr("alignment-baseline", "middle").attr("font-size", "13px");
+  });
+}
+
+// Scene 3: Average price by weekday
+function drawScene3() {
+  const svg = d3.select("#vis").append("svg").attr("width", 960).attr("height", 600);
+  const margin = { top: 60, right: 50, bottom: 100, left: 80 },
+        width = 960 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const weekdayOrder = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const grouped = d3.rollup(carData, v => d3.mean(v, d => d.price), d => d.weekday);
+  const data = Array.from(grouped, ([weekday, avgPrice]) => ({ weekday, avgPrice }))
+    .filter(d => weekdayOrder.includes(d.weekday))
+    .sort((a, b) => weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday));
+
+  const x = d3.scaleBand().domain(weekdayOrder).range([0, width]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.avgPrice)]).nice().range([height, 0]);
+  const colorScale = d3.scaleLinear().domain(d3.extent(data, d => d.avgPrice)).range(["#c6dbef", "#08519c"]);
+  const tooltip = d3.select("#tooltip");
+
+  g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x));
+  g.append("g").call(d3.axisLeft(y).tickFormat(d3.format(",")));
+
+  g.append("text").attr("x", width / 2).attr("y", -30).attr("text-anchor", "middle")
+    .attr("font-size", "18px").attr("font-weight", "bold")
+    .text("Average Used Car Price by Weekday");
+
+  g.selectAll("rect")
+    .data(data)
+    .enter().append("rect")
+    .attr("x", d => x(d.weekday))
+    .attr("y", d => y(d.avgPrice))
+    .attr("width", x.bandwidth())
+    .attr("height", d => height - y(d.avgPrice))
+    .attr("fill", d => colorScale(d.avgPrice))
+    .on("mouseover", (event, d) => {
+      tooltip.transition().style("opacity", 1);
+      tooltip.html(`<strong>${d.weekday}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}`);
+    })
+    .on("mousemove", event => {
+      tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+    })
+    .on("mouseout", () => tooltip.transition().style("opacity", 0));
+
+  g.selectAll("text.label")
+    .data(data)
+    .enter().append("text")
+    .attr("class", "label")
+    .attr("x", d => x(d.weekday) + x.bandwidth() / 2)
+    .attr("y", d => y(d.avgPrice) - 5)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "12px")
+    .attr("fill", "black")
+    .text(d => `$${d3.format(",.0f")(d.avgPrice)}`);
+}
+
+// Scene 4: Listing count by weekday
+function drawScene4() {
+  const svg = d3.select("#vis").append("svg").attr("width", 960).attr("height", 600);
+  const margin = { top: 60, right: 50, bottom: 100, left: 80 },
+    width = 960 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom;
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const weekdayOrder = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  const grouped = d3.rollup(
+    carData,
+    v => v.length,
+    d => d.weekday
+  );
+
+  const data = Array.from(grouped, ([weekday, count]) => ({ weekday, count }))
+    .filter(d => weekdayOrder.includes(d.weekday))
+    .sort((a, b) => weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday));
+
+  const x = d3.scaleBand().domain(weekdayOrder).range([0, width]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([height, 0]);
+
+  // 색상 스케일 (listing 수량에 따라 색상 진하기 조절)
+  const countExtent = d3.extent(data, d => d.count);
+  const colorScale = d3.scaleLinear().domain(countExtent).range(["#c6dbef", "#08519c"]);
+
+  const tooltip = d3.select("#tooltip");
+
+  // 축
+  g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x));
+  g.append("g").call(d3.axisLeft(y).tickFormat(d3.format(",")));
+
+  // 제목
   g.append("text")
     .attr("x", width / 2)
     .attr("y", -30)
     .attr("text-anchor", "middle")
     .attr("font-size", "18px")
     .attr("font-weight", "bold")
-    .text("Average Used Car Price by Brand (Colored by Country Group)");
+    .text("Number of Listings by Weekday");
 
-  const tooltip = d3.select("#tooltip");
-
-  g.selectAll("circle")
+  // 막대
+  g.selectAll("rect")
     .data(data)
-    .enter()
-    .append("circle")
-    .attr("cx", d => x(d.manufacturer) + x.bandwidth() / 2)
-    .attr("cy", d => y(d.avgPrice))
-    .attr("r", d => radius(d.count))
-    .attr("fill", d => color(d.country))
-    .attr("opacity", 0.8)
-    .on("mouseover", function (event, d) {
+    .enter().append("rect")
+    .attr("x", d => x(d.weekday))
+    .attr("y", d => y(d.count))
+    .attr("width", x.bandwidth())
+    .attr("height", d => height - y(d.count))
+    .attr("fill", d => colorScale(d.count))
+    .on("mouseover", (event, d) => {
       tooltip.transition().style("opacity", 1);
-      tooltip.html(
-        `<strong>${d.manufacturer}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}<br>Listings: ${d.count}<br>Country: ${d.country}`
-      );
+      tooltip.html(`<strong>${d.weekday}</strong><br>Listings: ${d.count}`);
     })
-    .on("mousemove", function (event) {
-      tooltip
-        .style("left", (event.pageX + 15) + "px")
-        .style("top", (event.pageY - 28) + "px");
+    .on("mousemove", event => {
+      tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
     })
-    .on("mouseout", function () {
-      tooltip.transition().style("opacity", 0);
-    });
+    .on("mouseout", () => tooltip.transition().style("opacity", 0));
 
-  const legend = svg.append("g")
-    .attr("transform", `translate(${width + margin.left + 20},${margin.top})`);
-
-  const countries = color.domain();
-
-  countries.forEach((country, i) => {
-    const yOffset = i * 25;
-    legend.append("circle")
-      .attr("cx", 0)
-      .attr("cy", yOffset)
-      .attr("r", 6)
-      .attr("fill", color(country));
-
-    legend.append("text")
-      .attr("x", 15)
-      .attr("y", yOffset + 5)
-      .text(country)
-      .attr("alignment-baseline", "middle")
-      .attr("font-size", "13px");
-  });
+  // 수치 라벨
+  g.selectAll("text.label")
+    .data(data)
+    .enter().append("text")
+    .attr("class", "label")
+    .attr("x", d => x(d.weekday) + x.bandwidth() / 2)
+    .attr("y", d => y(d.count) - 5)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "12px")
+    .attr("fill", "black")
+    .text(d => d3.format(",")(d.count));
 }
