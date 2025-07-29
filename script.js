@@ -336,15 +336,6 @@ function drawScene1() {
 
 
 
-
-
-
-
-
-
-
-
-
 function drawScene2() {
   const svg = createSVG();
   const margin = { top: 60, right: 250, bottom: 100, left: 80 },
@@ -353,21 +344,38 @@ function drawScene2() {
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
   const grouped = d3.rollup(carData, v => ({ count: v.length, country: v[0].brand_group }), d => d.manufacturer);
-  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values })).sort((a, b) => b.count - a.count);
+  const data = Array.from(grouped, ([manufacturer, values]) => ({ manufacturer, ...values }))
+    .sort((a, b) => b.count - a.count);
 
   const x = d3.scaleBand().domain(data.map(d => d.manufacturer)).range([0, width]).padding(0.2);
   const y = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([height, 0]);
   const tooltip = d3.select("#tooltip");
 
-  g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text")
-    .attr("transform", "rotate(-45)").style("text-anchor", "end");
-  g.append("g").call(d3.axisLeft(y));
+  let activeCountry = null;
 
-  g.append("text").attr("x", width / 2).attr("y", -30).attr("text-anchor", "middle")
-    .attr("font-size", "18px").attr("font-weight", "bold")
+  // ✅ x축
+  g.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x))
+    .selectAll("text")
+    .attr("transform", "rotate(-45)")
+    .style("text-anchor", "end");
+
+  // ✅ y축
+  g.append("g")
+    .call(d3.axisLeft(y));
+
+  // ✅ 타이틀
+  g.append("text")
+    .attr("x", width / 2)
+    .attr("y", -30)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "18px")
+    .attr("font-weight", "bold")
     .text("Number of Listings by Brand (Colored by Country Group)");
 
-  g.selectAll("rect")
+  // ✅ 막대
+  const bars = g.selectAll("rect")
     .data(data)
     .enter().append("rect")
     .attr("x", d => x(d.manufacturer))
@@ -375,28 +383,32 @@ function drawScene2() {
     .attr("width", x.bandwidth())
     .attr("height", d => height - y(d.count))
     .attr("fill", d => color(d.country))
+    .attr("opacity", 1)
     .on("mouseover", (event, d) => {
       tooltip.transition().style("opacity", 1);
       tooltip.html(`<strong>${d.manufacturer}</strong><br>Listings: ${d.count}<br>Country: ${d.country}`);
+      bars.transition().duration(200)
+        .attr("opacity", b => b.country === d.country ? 1 : 0.1);
+      d3.selectAll(".annotation").style("display", "none");
     })
     .on("mousemove", event => {
       tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
     })
-    .on("mouseout", () => tooltip.transition().style("opacity", 0));
+    .on("mouseout", () => {
+      tooltip.transition().style("opacity", 0);
+      bars.transition().duration(200)
+        .attr("opacity", b => activeCountry ? (b.country === activeCountry ? 1 : 0.1) : 1);
+      if (!activeCountry) {
+        d3.selectAll(".annotation").style("display", "block");
+      }
+    });
 
-  const legend = svg.append("g").attr("transform", `translate(${width + margin.left + 20},${margin.top})`);
-  color.domain().forEach((country, i) => {
-    const yOffset = i * 25;
-    legend.append("circle").attr("cx", 0).attr("cy", yOffset).attr("r", 6).attr("fill", color(country));
-    legend.append("text").attr("x", 15).attr("y", yOffset + 5).text(country)
-      .attr("alignment-baseline", "middle").attr("font-size", "13px");
-  });
-
- 
+  // ✅ Annotation: Japanese
   const japaneseBrands = ["toyota", "honda", "nissan", "subaru", "lexus", "mitsubishi"];
   const japanLineY = 7000;
 
   g.append("text")
+    .attr("class", "annotation")
     .attr("x", (x("toyota") + x("mitsubishi")) / 2)
     .attr("y", y(japanLineY) - 10)
     .attr("text-anchor", "middle")
@@ -406,6 +418,7 @@ function drawScene2() {
     .text("Japanese brands have high listings");
 
   g.append("line")
+    .attr("class", "annotation")
     .attr("x1", x("toyota") + x.bandwidth() / 2)
     .attr("x2", x("mitsubishi") + x.bandwidth() / 2)
     .attr("y1", y(japanLineY))
@@ -415,6 +428,7 @@ function drawScene2() {
 
   japaneseBrands.forEach(brand => {
     g.append("line")
+      .attr("class", "annotation")
       .attr("x1", x(brand) + x.bandwidth() / 2)
       .attr("x2", x(brand) + x.bandwidth() / 2)
       .attr("y1", y(japanLineY))
@@ -424,12 +438,14 @@ function drawScene2() {
       .attr("stroke-width", 1);
   });
 
+  // ✅ Annotation: German
   const germanBrands = ["bmw", "mercedes-benz", "audi", "volkswagen", "porsche"];
-  const lineY = 5000; // 기존보다 낮춘 높이
+  const lineY = 5000;
 
   g.append("text")
+    .attr("class", "annotation")
     .attr("x", (x("bmw") + x("porsche")) / 2)
-    .attr("y", y(lineY) - 10) // 이 부분이 핵심
+    .attr("y", y(lineY) - 10)
     .attr("text-anchor", "middle")
     .attr("fill", "firebrick")
     .attr("font-size", "14px")
@@ -437,6 +453,7 @@ function drawScene2() {
     .text("German brands have moderate listings");
 
   g.append("line")
+    .attr("class", "annotation")
     .attr("x1", x("bmw") + x.bandwidth() / 2)
     .attr("x2", x("porsche") + x.bandwidth() / 2)
     .attr("y1", y(lineY))
@@ -445,21 +462,83 @@ function drawScene2() {
     .attr("stroke-width", 1);
 
   germanBrands.forEach(brand => {
-  g.append("line")
-    .attr("x1", x(brand) + x.bandwidth() / 2)
-    .attr("x2", x(brand) + x.bandwidth() / 2)
-    .attr("y1", y(lineY))      .attr("y2", y(data.find(d => d.manufacturer === brand).count))
-    .attr("stroke", "firebrick")
-    .attr("stroke-dasharray", "4,3")
-    .attr("stroke-width", 1);
+    g.append("line")
+      .attr("class", "annotation")
+      .attr("x1", x(brand) + x.bandwidth() / 2)
+      .attr("x2", x(brand) + x.bandwidth() / 2)
+      .attr("y1", y(lineY))
+      .attr("y2", y(data.find(d => d.manufacturer === brand).count))
+      .attr("stroke", "firebrick")
+      .attr("stroke-dasharray", "4,3")
+      .attr("stroke-width", 1);
   });
 
+  // ✅ Legend Box
+  const legendBoxWidth = 140;
+  const legendBoxHeight = color.domain().length * 25 + 30;
+  const legendX = width + margin.left + 10;
+  const legendY = margin.top - 35;
 
+  svg.append("rect")
+    .attr("x", legendX)
+    .attr("y", legendY)
+    .attr("width", legendBoxWidth)
+    .attr("height", legendBoxHeight)
+    .attr("fill", "#f5f5f5")
+    .attr("stroke", "#ccc")
+    .attr("stroke-width", 1)
+    .attr("rx", 8)
+    .attr("ry", 8);
+
+  svg.append("text")
+    .attr("x", legendX + 10)
+    .attr("y", legendY + 18)
+    .text("Click a country to filter")
+    .attr("font-size", "13px")
+    .attr("fill", "#666");
+
+  const legend = svg.append("g")
+    .attr("transform", `translate(${legendX + 10}, ${legendY + 30})`);
+
+  color.domain().forEach((country, i) => {
+    const yOffset = i * 25;
+
+    legend.append("circle")
+      .attr("cx", 0)
+      .attr("cy", yOffset)
+      .attr("r", 6)
+      .attr("fill", color(country))
+      .style("cursor", "pointer")
+      .on("click", () => toggleCountryFilter(country));
+
+    legend.append("text")
+      .attr("x", 15)
+      .attr("y", yOffset + 5)
+      .text(country)
+      .attr("alignment-baseline", "middle")
+      .attr("font-size", "13px")
+      .style("cursor", "pointer")
+      .on("click", () => toggleCountryFilter(country));
+  });
+
+  function toggleCountryFilter(country) {
+    if (activeCountry === country) {
+      activeCountry = null;
+      bars.transition().duration(300).attr("opacity", 1);
+      d3.selectAll(".annotation").style("display", "block");
+    } else {
+      activeCountry = country;
+      bars.transition().duration(300)
+        .attr("opacity", d => d.country === country ? 1 : 0.1);
+      d3.selectAll(".annotation").style("display", "none");
+    }
+  }
 }
+
 
 function drawScene3() {
   const svg = createSVG();
-  const margin = { top: 60, right: 50, bottom: 100, left: 80 },
+  const margin = { top: 60, right: 50, bottom: 140, left: 80 },
         width = 960 - margin.left - margin.right,
         height = 600 - margin.top - margin.bottom;
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
@@ -486,6 +565,7 @@ function drawScene3() {
 
   const tooltip = d3.select("#tooltip");
 
+  // Axes
   g.append("g")
     .attr("transform", `translate(0,${height})`)
     .call(d3.axisBottom(x));
@@ -493,6 +573,7 @@ function drawScene3() {
   g.append("g")
     .call(d3.axisLeft(y).tickFormat(d3.format(",")));
 
+  // Title
   g.append("text")
     .attr("x", width / 2)
     .attr("y", -30)
@@ -501,7 +582,8 @@ function drawScene3() {
     .attr("font-weight", "bold")
     .text("Average Used Car Price by Weekday");
 
-  g.selectAll("rect")
+  // Bars
+  const bars = g.selectAll("rect")
     .data(data)
     .enter().append("rect")
     .attr("x", d => x(d.weekday))
@@ -509,16 +591,20 @@ function drawScene3() {
     .attr("width", x.bandwidth())
     .attr("height", d => height - y(d.avgPrice))
     .attr("fill", d => colorScale(d.avgPrice))
-    .on("mouseover", (event, d) => {
+    .on("mouseover", function (event, d) {
       tooltip.transition().style("opacity", 1);
       tooltip.html(`<strong>${d.weekday}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}`);
+      bars.transition().style("opacity", b => b.weekday === d.weekday ? 1 : 0.2);
     })
     .on("mousemove", event => {
       tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
     })
-    .on("mouseout", () => tooltip.transition().style("opacity", 0));
+    .on("mouseout", () => {
+      tooltip.transition().style("opacity", 0);
+      bars.transition().style("opacity", 1);
+    });
 
-  // Bar 위 텍스트 (가격 라벨)
+  // Price labels above bars
   g.selectAll("text.label")
     .data(data)
     .enter().append("text")
@@ -530,27 +616,28 @@ function drawScene3() {
     .attr("fill", "black")
     .text(d => `$${d3.format(",.0f")(d.avgPrice)}`);
 
-  // Annotation: Sunday 최고가
+  // Annotation: Highest average price on Sunday
   const sunday = data.find(d => d.weekday === "Sunday");
+  // Annotation: Highest average price on Sunday
   g.append("text")
     .attr("x", x("Sunday") + x.bandwidth() / 2)
-    .attr("y", y(sunday.avgPrice) - 40)
+    .attr("y", y(sunday.avgPrice) - 35)  // 다시 위로 이동
     .attr("text-anchor", "middle")
     .attr("fill", "#08519c")
-    .attr("font-size", "14px")
+    .attr("font-size", "13px")
     .attr("font-weight", "bold")
-    .text("Highest average price");
+    .text("Highest avg price");
 
   g.append("line")
     .attr("x1", x("Sunday") + x.bandwidth() / 2)
     .attr("x2", x("Sunday") + x.bandwidth() / 2)
     .attr("y1", y(sunday.avgPrice) - 10)
-    .attr("y2", y(sunday.avgPrice) - 35)
+    .attr("y2", y(sunday.avgPrice) - 30)  // 선도 함께 위로 이동
     .attr("stroke", "#08519c")
     .attr("stroke-width", 1)
     .attr("stroke-dasharray", "4 2");
 
-  // Annotation: Monday, Tuesday 낮은 가격
+  // Annotation: Lower prices on Monday, Tuesday
   ["Monday", "Tuesday"].forEach(day => {
     const entry = data.find(d => d.weekday === day);
     g.append("text")
@@ -561,25 +648,56 @@ function drawScene3() {
       .attr("font-size", "12px")
       .text("Lower prices");
   });
+
+  // Color legend
+  const defs = svg.append("defs");
+  const linearGradient = defs.append("linearGradient")
+    .attr("id", "color-gradient");
+
+  linearGradient.selectAll("stop")
+    .data([
+      { offset: "0%", color: "#c6dbef" },
+      { offset: "100%", color: "#08519c" }
+    ])
+    .enter().append("stop")
+    .attr("offset", d => d.offset)
+    .attr("stop-color", d => d.color);
+
+  const legendWidth = 200;
+  const legendHeight = 10;
+
+  const legend = svg.append("g")
+    .attr("transform", `translate(${(width + margin.left + margin.right - legendWidth) / 2}, ${height + margin.top + 50})`);
+
+  legend.append("rect")
+    .attr("width", legendWidth)
+    .attr("height", legendHeight)
+    .style("fill", "url(#color-gradient)");
+
+  legend.append("text")
+    .attr("x", legendWidth / 2)
+    .attr("y", -10)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "13px")
+    .attr("font-weight", "bold")
+    .text("Color = Avg. Used Car Price");
 }
 
 
 function drawScene4() {
   const svg = createSVG();
-  const margin = { top: 60, right: 60, bottom: 100, left: 80 },
+  const margin = { top: 60, right: 50, bottom: 140, left: 80 },
         width = 960 - margin.left - margin.right,
         height = 600 - margin.top - margin.bottom;
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
   const weekdayOrder = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-  // Listings 수 (bar chart용)
   const groupedListings = d3.rollup(carData, v => v.length, d => d.weekday);
   const listingsData = Array.from(groupedListings, ([weekday, count]) => ({ weekday, count }))
     .filter(d => weekdayOrder.includes(d.weekday))
     .sort((a, b) => weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday));
 
-  // 평균 가격 (line chart용)
   const groupedPrices = d3.rollup(carData, v => d3.mean(v, d => d.price), d => d.weekday);
   const priceData = Array.from(groupedPrices, ([weekday, avgPrice]) => ({ weekday, avgPrice }))
     .filter(d => weekdayOrder.includes(d.weekday))
@@ -605,21 +723,17 @@ function drawScene4() {
 
   const tooltip = d3.select("#tooltip");
 
-  // x축
   g.append("g")
     .attr("transform", `translate(0,${height})`)
     .call(d3.axisBottom(x));
 
-  // 왼쪽 y축 (listing 수)
   g.append("g")
     .call(d3.axisLeft(yLeft).tickFormat(d3.format(",")));
 
-  // 오른쪽 y축 (가격)
   g.append("g")
     .attr("transform", `translate(${width},0)`)
     .call(d3.axisRight(yRight).tickFormat(d3.format("$,.0f")));
 
-  // Title
   g.append("text")
     .attr("x", width / 2)
     .attr("y", -30)
@@ -689,26 +803,38 @@ function drawScene4() {
     })
     .on("mouseout", () => tooltip.transition().style("opacity", 0));
 
+  // Avg. price labels under each point
+  g.selectAll("text.price-label")
+    .data(priceData)
+    .enter().append("text")
+    .attr("class", "price-label")
+    .attr("x", d => x(d.weekday) + x.bandwidth() / 2)
+    .attr("y", d => yRight(d.avgPrice) + 18)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "11px")
+    .attr("fill", "crimson")
+    .text(d => `$${d3.format(",.0f")(d.avgPrice)}`);
+
+  // Summary annotation
+  g.append("text")
+    .attr("x", width - 10)
+    .attr("y", 15)
+    .attr("text-anchor", "end")
+    .attr("fill", "#1f77b4")
+    .attr("font-size", "13px")
+    .attr("font-weight", "bold")
+    .text("More listings and lower prices on Mon/Tue,");
 
   g.append("text")
-  .attr("x", width - 10)
-  .attr("y", 15)
-  .attr("text-anchor", "end")
-  .attr("fill", "#1f77b4")  // 변경된 색상
-  .attr("font-size", "13px")
-  .attr("font-weight", "bold")
-  .text("More listings and lower prices on Mon/Tue,");
+    .attr("x", width - 10)
+    .attr("y", 32)
+    .attr("text-anchor", "end")
+    .attr("fill", "#1f77b4")
+    .attr("font-size", "13px")
+    .attr("font-weight", "bold")
+    .text("but fewer listings and higher prices on Sunday.");
+}
 
-  g.append("text")
-  .attr("x", width - 10)
-  .attr("y", 32)
-  .attr("text-anchor", "end")
-  .attr("fill", "#1f77b4")  // 변경된 색상
-  .attr("font-size", "13px")
-  .attr("font-weight", "bold")
-  .text("but fewer listings and higher prices on Sunday.");
-
-};
 
 function drawScene5() {
   const container = d3.select("#vis");
