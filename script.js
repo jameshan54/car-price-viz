@@ -64,7 +64,6 @@ function renderScene(scene) {
 }
 
 
-
 const color = d3.scaleOrdinal()
   .domain(["USA", "Germany", "Japan", "Korea", "UK", "Italy", "Other", "Sweden"])
   .range(["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#7f7f7f", "#17becf"]);
@@ -73,7 +72,7 @@ function createSVG() {
   return d3.select("#vis")
     .append("svg")
     .attr("width", 960)
-    .attr("height", 500)
+    .attr("height", 550)
     .style("display", "block")
     .style("margin", "0 auto");
 }
@@ -110,9 +109,10 @@ function drawScene1() {
     .attr("font-size", "18px").attr("font-weight", "bold")
     .text("Average Used Car Price by Brand (Colored by Country Group)");
 
-  g.selectAll("circle")
+  const dots = g.selectAll("circle")
     .data(data)
     .enter().append("circle")
+    .attr("class", "dot")
     .attr("cx", d => x(d.manufacturer) + x.bandwidth() / 2)
     .attr("cy", d => y(d.avgPrice))
     .attr("r", d => radius(d.count))
@@ -121,20 +121,59 @@ function drawScene1() {
     .on("mouseover", (event, d) => {
       tooltip.transition().style("opacity", 1);
       tooltip.html(`<strong>${d.manufacturer}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}<br>Listings: ${d.count}<br>Country: ${d.country}`);
+      g.selectAll("circle")
+        .attr("opacity", c => c.country === d.country ? 1 : 0.1);
     })
     .on("mousemove", event => {
       tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
     })
-    .on("mouseout", () => tooltip.transition().style("opacity", 0));
+    .on("mouseout", () => {
+      tooltip.transition().style("opacity", 0);
+      g.selectAll("circle").attr("opacity", 0.8);
+    });
 
+  // Interactive Legend
   const legend = svg.append("g").attr("transform", `translate(${width + margin.left + 20},${margin.top})`);
+  let activeCountry = null;
+
   color.domain().forEach((country, i) => {
     const yOffset = i * 25;
-    legend.append("circle").attr("cx", 0).attr("cy", yOffset).attr("r", 6).attr("fill", color(country));
-    legend.append("text").attr("x", 15).attr("y", yOffset + 5).text(country)
-      .attr("alignment-baseline", "middle").attr("font-size", "13px");
+    legend.append("circle")
+      .attr("cx", 0)
+      .attr("cy", yOffset)
+      .attr("r", 6)
+      .attr("fill", color(country))
+      .style("cursor", "pointer")
+      .on("click", () => {
+        if (activeCountry === country) {
+          // Reset
+          activeCountry = null;
+          dots.attr("opacity", 0.8);
+        } else {
+          activeCountry = country;
+          dots.attr("opacity", d => d.country === country ? 1 : 0.1);
+        }
+      });
+
+    legend.append("text")
+      .attr("x", 15)
+      .attr("y", yOffset + 5)
+      .text(country)
+      .attr("alignment-baseline", "middle")
+      .attr("font-size", "13px")
+      .style("cursor", "pointer")
+      .on("click", () => {
+        if (activeCountry === country) {
+          activeCountry = null;
+          dots.attr("opacity", 0.8);
+        } else {
+          activeCountry = country;
+          dots.attr("opacity", d => d.country === country ? 1 : 0.1);
+        }
+      });
   });
 
+  // Annotations
   const japanTextX = x("mazda");
   const japanTextY = y(25000);
 
@@ -187,6 +226,7 @@ function drawScene1() {
     .attr("stroke-width", 1)
     .attr("stroke-opacity", 0.4);
 }
+
 
 
 function drawScene2() {

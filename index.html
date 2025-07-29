@@ -7,26 +7,38 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="intro" style="text-align: center; margin-top: 100px;">
-    <h1 style="font-size: 36px; font-weight: bold;">What’s the Smartest Way to Buy a Used Car?</h1>
-    <p style="font-size: 22px; margin-top: 30px;">Are Japanese cars generally cheaper than German ones?<br>
-    Which day of the week is best for finding good deals?</p>
-    <p style="font-size: 22px; margin-top: 20px;">Let’s explore the data to make smarter buying decisions.</p>
-    <button id="start-btn" style="margin-top: 40px; padding: 12px 24px; font-size: 18px; background-color: #3377FF; color: white; border: none; border-radius: 6px;">Start</button>
+
+  <!-- Intro Section -->
+  <div id="intro">
+    <h1>What’s the Smartest Way to Buy a Used Car?</h1>
+
+    <div class="question-block">
+      <p class="main-question">"Which brands offer better value – German or Japanese?"</p>
+      <p class="sub-question">"Is Honda more affordable than Toyota? What about BMW vs Mercedes?"</p>
+    </div>
+
+    <hr class="divider">
+
+    <div class="question-block">
+      <p class="main-question">"What day of the week offers the best deals?"</p>
+      <p class="sub-question">"Is it better to buy a car at the end of the week or the beginning?"</p>
+    </div>
+
+    <button id="start-btn">Start</button>
   </div>
 
+  <!-- Visualization Section -->
   <div id="vis-section" style="display: none; margin-top: 40px;">
     <h2 id="scene-title" style="text-align: center; font-size: 28px; margin-bottom: 20px;"></h2>
     <div id="vis" style="margin-bottom: 20px;"></div>
 
-    <!-- 🔽 버튼 간격을 줄이고 항상 보이도록 위치 조정 -->
-    <div style="text-align: center; margin-top: 10px;">
+    <div style="text-align: center; margin-top: 10px; margin-bottom: 60px;">
       <button id="prev" style="padding: 10px 20px; font-size: 16px; margin-right: 20px; display: none;">Previous</button>
       <button id="next" style="padding: 10px 20px; font-size: 16px;">Next</button>
     </div>
   </div>
 
-  <!-- 툴팁 -->
+  <!-- Tooltip -->
   <div id="tooltip" style="position: absolute; opacity: 0; background-color: white; padding: 8px; border: 1px solid #ccc; border-radius: 4px; pointer-events: none; font-size: 14px;"></div>
 
   <script src="script.js"></script>
