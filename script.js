@@ -571,7 +571,8 @@ function drawScene3() {
     .call(d3.axisBottom(x));
 
   g.append("g")
-    .call(d3.axisLeft(y).tickFormat(d3.format(",")));
+  .call(d3.axisLeft(y).tickFormat(d => `$${d3.format(",")(d)}`));
+
 
   // Title
   g.append("text")
@@ -693,15 +694,26 @@ function drawScene4() {
 
   const weekdayOrder = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+  // 평균 가격 (bar chart용)
+  const groupedPrices = d3.rollup(carData, v => d3.mean(v, d => d.price), d => d.weekday);
+  const priceData = Array.from(groupedPrices, ([weekday, avgPrice]) => ({ weekday, avgPrice }))
+    .filter(d => weekdayOrder.includes(d.weekday))
+    .sort((a, b) => weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday));
+
+  // Listings 수 (line chart용)
   const groupedListings = d3.rollup(carData, v => v.length, d => d.weekday);
   const listingsData = Array.from(groupedListings, ([weekday, count]) => ({ weekday, count }))
     .filter(d => weekdayOrder.includes(d.weekday))
     .sort((a, b) => weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday));
 
-  const groupedPrices = d3.rollup(carData, v => d3.mean(v, d => d.price), d => d.weekday);
-  const priceData = Array.from(groupedPrices, ([weekday, avgPrice]) => ({ weekday, avgPrice }))
-    .filter(d => weekdayOrder.includes(d.weekday))
-    .sort((a, b) => weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday));
+  // y축 범위 설정
+  const yPrice = d3.scaleLinear()
+    .domain([0, d3.max(priceData, d => d.avgPrice)]).nice()
+    .range([height, 0]);
+
+  const yListing = d3.scaleLinear()
+    .domain([0, d3.max(listingsData, d => d.count)]).nice()
+    .range([height, 0]);
 
   const x = d3.scaleBand()
     .domain(weekdayOrder)
@@ -709,131 +721,114 @@ function drawScene4() {
     .paddingInner(0.05)
     .paddingOuter(0.05);
 
-  const yLeft = d3.scaleLinear()
-    .domain([0, d3.max(listingsData, d => d.count)]).nice()
-    .range([height, 0]);
-
-  const yRight = d3.scaleLinear()
-    .domain([d3.min(priceData, d => d.avgPrice) * 0.95, d3.max(priceData, d => d.avgPrice) * 1.05])
-    .range([height, 0]);
-
   const colorScale = d3.scaleLinear()
-    .domain(d3.extent(listingsData, d => d.count))
+    .domain(d3.extent(priceData, d => d.avgPrice))
     .range(["#c6dbef", "#08519c"]);
 
   const tooltip = d3.select("#tooltip");
 
+  // x축
   g.append("g")
     .attr("transform", `translate(0,${height})`)
     .call(d3.axisBottom(x));
 
+  // y축 (price)
   g.append("g")
-    .call(d3.axisLeft(yLeft).tickFormat(d3.format(",")));
+    .call(d3.axisLeft(yPrice).tickFormat(d3.format(",")));
 
+  // 왼쪽 y축 (평균 가격)
   g.append("g")
-    .attr("transform", `translate(${width},0)`)
-    .call(d3.axisRight(yRight).tickFormat(d3.format("$,.0f")));
+    .call(d3.axisLeft(yPrice).tickFormat(d => `$${d3.format(",")(d)}`));
 
+  // 오른쪽 y축 (리스트 수)
+  g.append("g")
+    .attr("transform", `translate(${width}, 0)`)
+    .call(d3.axisRight(yListing).tickFormat(d3.format(",")))
+    .append("text")
+    .attr("x", 40)
+    .attr("y", -20)
+    .attr("fill", "crimson")
+    .attr("text-anchor", "start")
+    .attr("font-size", "12px")
+
+
+  // Title
   g.append("text")
     .attr("x", width / 2)
     .attr("y", -30)
     .attr("text-anchor", "middle")
     .attr("font-size", "18px")
     .attr("font-weight", "bold")
-    .text("Number of Listings by Weekday (with Avg. Price Line)");
+    .text("Average Price by Weekday (with Listings Line)");
 
-  // Bar chart
-  g.selectAll("rect")
-    .data(listingsData)
+  // Bar chart for price
+  const bars = g.selectAll("rect")
+    .data(priceData)
     .enter().append("rect")
     .attr("x", d => x(d.weekday))
-    .attr("y", d => yLeft(d.count))
+    .attr("y", d => yPrice(d.avgPrice))
     .attr("width", x.bandwidth())
-    .attr("height", d => height - yLeft(d.count))
-    .attr("fill", d => colorScale(d.count))
-    .on("mouseover", (event, d) => {
-      tooltip.transition().style("opacity", 1);
-      tooltip.html(`<strong>${d.weekday}</strong><br>Listings: ${d3.format(",")(d.count)}`);
-    })
-    .on("mousemove", event => {
-      tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
-    })
-    .on("mouseout", () => tooltip.transition().style("opacity", 0));
-
-  // Bar labels
-  g.selectAll("text.label")
-    .data(listingsData)
-    .enter().append("text")
-    .attr("class", "label")
-    .attr("x", d => x(d.weekday) + x.bandwidth() / 2)
-    .attr("y", d => yLeft(d.count) - 5)
-    .attr("text-anchor", "middle")
-    .attr("font-size", "12px")
-    .attr("fill", "black")
-    .text(d => d3.format(",")(d.count));
-
-  // Line path (price)
-  const line = d3.line()
-    .x(d => x(d.weekday) + x.bandwidth() / 2)
-    .y(d => yRight(d.avgPrice));
-
-  g.append("path")
-    .datum(priceData)
-    .attr("fill", "none")
-    .attr("stroke", "crimson")
-    .attr("stroke-width", 2)
-    .attr("d", line);
-
-  // Line circle markers
-  g.selectAll("circle.price-point")
-    .data(priceData)
-    .enter()
-    .append("circle")
-    .attr("class", "price-point")
-    .attr("cx", d => x(d.weekday) + x.bandwidth() / 2)
-    .attr("cy", d => yRight(d.avgPrice))
-    .attr("r", 4)
-    .attr("fill", "crimson")
-    .on("mouseover", (event, d) => {
+    .attr("height", d => height - yPrice(d.avgPrice))
+    .attr("fill", d => colorScale(d.avgPrice))
+    .on("mouseover", function (event, d) {
       tooltip.transition().style("opacity", 1);
       tooltip.html(`<strong>${d.weekday}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}`);
+      bars.transition().style("opacity", b => b.weekday === d.weekday ? 1 : 0.2);
     })
     .on("mousemove", event => {
       tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
     })
-    .on("mouseout", () => tooltip.transition().style("opacity", 0));
+    .on("mouseout", () => {
+      tooltip.transition().style("opacity", 0);
+      bars.transition().style("opacity", 1);
+    });
 
-  // Avg. price labels under each point
+  // Price labels
   g.selectAll("text.price-label")
     .data(priceData)
     .enter().append("text")
     .attr("class", "price-label")
     .attr("x", d => x(d.weekday) + x.bandwidth() / 2)
-    .attr("y", d => yRight(d.avgPrice) + 18)
+    .attr("y", d => yPrice(d.avgPrice) - 5)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "12px")
+    .attr("fill", "black")
+    .text(d => `$${d3.format(",.0f")(d.avgPrice)}`);
+
+  // Listings line
+  const line = d3.line()
+    .x(d => x(d.weekday) + x.bandwidth() / 2)
+    .y(d => yListing(d.count));
+
+  g.append("path")
+    .datum(listingsData)
+    .attr("fill", "none")
+    .attr("stroke", "crimson")
+    .attr("stroke-width", 2)
+    .attr("d", line);
+
+  // Listings point + label
+  g.selectAll("circle.listing-point")
+    .data(listingsData)
+    .enter().append("circle")
+    .attr("class", "listing-point")
+    .attr("cx", d => x(d.weekday) + x.bandwidth() / 2)
+    .attr("cy", d => yListing(d.count))
+    .attr("r", 4)
+    .attr("fill", "crimson");
+
+  g.selectAll("text.listing-label")
+    .data(listingsData)
+    .enter().append("text")
+    .attr("class", "listing-label")
+    .attr("x", d => x(d.weekday) + x.bandwidth() / 2)
+    .attr("y", d => yListing(d.count) - 10)
     .attr("text-anchor", "middle")
     .attr("font-size", "11px")
     .attr("fill", "crimson")
-    .text(d => `$${d3.format(",.0f")(d.avgPrice)}`);
-
-  // Summary annotation
-  g.append("text")
-    .attr("x", width - 10)
-    .attr("y", 15)
-    .attr("text-anchor", "end")
-    .attr("fill", "#1f77b4")
-    .attr("font-size", "13px")
-    .attr("font-weight", "bold")
-    .text("More listings and lower prices on Mon/Tue,");
-
-  g.append("text")
-    .attr("x", width - 10)
-    .attr("y", 32)
-    .attr("text-anchor", "end")
-    .attr("fill", "#1f77b4")
-    .attr("font-size", "13px")
-    .attr("font-weight", "bold")
-    .text("but fewer listings and higher prices on Sunday.");
+    .text(d => d3.format(",")(d.count));
 }
+
 
 
 function drawScene5() {
