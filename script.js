@@ -65,8 +65,8 @@ function renderScene(scene) {
 
 
 const color = d3.scaleOrdinal()
-  .domain(["USA", "Germany", "Japan", "Korea", "UK", "Italy", "Other", "Sweden"])
-  .range(["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#7f7f7f", "#17becf"]);
+  .domain(["USA", "Germany", "Japan", "Korea", "UK", "Italy", "Sweden"])
+  .range(["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#17becf"]);
 
 function createSVG() {
   return d3.select("#vis")
@@ -121,8 +121,7 @@ function drawScene1() {
     .on("mouseover", (event, d) => {
       tooltip.transition().style("opacity", 1);
       tooltip.html(`<strong>${d.manufacturer}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}<br>Listings: ${d.count}<br>Country: ${d.country}`);
-      g.selectAll("circle")
-        .attr("opacity", c => c.country === d.country ? 1 : 0.1);
+      g.selectAll("circle").attr("opacity", c => c.country === d.country ? 1 : 0.1);
     })
     .on("mousemove", event => {
       tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
@@ -132,9 +131,34 @@ function drawScene1() {
       g.selectAll("circle").attr("opacity", 0.8);
     });
 
-  // Interactive Legend
-  const legend = svg.append("g").attr("transform", `translate(${width + margin.left + 20},${margin.top})`);
+  // === Legend ===
+  const legendBoxWidth = 140;
+  const legendBoxHeight = color.domain().length * 25 + 30;
+  const legendX = width + margin.left + 10;
+  const legendY = margin.top - 35;
+
+  svg.append("rect")
+    .attr("x", legendX)
+    .attr("y", legendY)
+    .attr("width", legendBoxWidth)
+    .attr("height", legendBoxHeight)
+    .attr("fill", "#f5f5f5")
+    .attr("stroke", "#ccc")
+    .attr("stroke-width", 1)
+    .attr("rx", 8)
+    .attr("ry", 8);
+
+  svg.append("text")
+    .attr("x", legendX + 10)
+    .attr("y", legendY + 18)
+    .text("Click a country to filter")
+    .attr("font-size", "13px")
+    .attr("fill", "#666");
+
+  const legend = svg.append("g")
+    .attr("transform", `translate(${legendX + 10}, ${legendY + 30})`);
   let activeCountry = null;
+  let brandLabels;
 
   color.domain().forEach((country, i) => {
     const yOffset = i * 25;
@@ -144,16 +168,7 @@ function drawScene1() {
       .attr("r", 6)
       .attr("fill", color(country))
       .style("cursor", "pointer")
-      .on("click", () => {
-        if (activeCountry === country) {
-          // Reset
-          activeCountry = null;
-          dots.attr("opacity", 0.8);
-        } else {
-          activeCountry = country;
-          dots.attr("opacity", d => d.country === country ? 1 : 0.1);
-        }
-      });
+      .on("click", () => toggleCountryFilter(country));
 
     legend.append("text")
       .attr("x", 15)
@@ -162,70 +177,160 @@ function drawScene1() {
       .attr("alignment-baseline", "middle")
       .attr("font-size", "13px")
       .style("cursor", "pointer")
-      .on("click", () => {
-        if (activeCountry === country) {
-          activeCountry = null;
-          dots.attr("opacity", 0.8);
-        } else {
-          activeCountry = country;
-          dots.attr("opacity", d => d.country === country ? 1 : 0.1);
-        }
-      });
+      .on("click", () => toggleCountryFilter(country));
   });
 
-  // Annotations
-  const japanTextX = x("mazda");
-  const japanTextY = y(25000);
+  function toggleCountryFilter(country) {
+    if (activeCountry === country) {
+      activeCountry = null;
+      dots.attr("opacity", 0.8);
+      if (brandLabels) brandLabels.remove();
+    } else {
+      activeCountry = country;
+      dots.attr("opacity", d => d.country === country ? 1 : 0.1);
+      if (brandLabels) brandLabels.remove();
+      brandLabels = g.selectAll(".brand-label")
+        .data(data.filter(d => d.country === country))
+        .enter()
+        .append("text")
+        .attr("class", "brand-label")
+        .attr("x", d => x(d.manufacturer) + x.bandwidth() / 2 + 8)
+        .attr("y", d => y(d.avgPrice) + 12)
+        .attr("text-anchor", "start")
+        .attr("fill", color(country))
+        .attr("font-size", "11px")
+        .text(d => d.manufacturer);
+    }
+  }
+
+  // === Japan Horizontal Annotation ===
+  const japanBrands = data.filter(d => d.country === "Japan");
+  const japanY = y(27000);
+
+  g.selectAll(".japan-line")
+    .data(japanBrands)
+    .enter()
+    .append("line")
+    .attr("x1", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("y1", d => y(d.avgPrice))
+    .attr("x2", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("y2", japanY)
+    .attr("stroke", "green")
+    .attr("stroke-width", 1)
+    .attr("stroke-dasharray", "4 2")
+    .attr("stroke-opacity", 0.6);
+
+  const japanMinX = d3.min(japanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
+  const japanMaxX = d3.max(japanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
+
+  g.append("line")
+    .attr("x1", japanMinX)
+    .attr("x2", japanMaxX)
+    .attr("y1", japanY)
+    .attr("y2", japanY)
+    .attr("stroke", "green")
+    .attr("stroke-width", 1.2)
+    .attr("stroke-opacity", 0.6);
 
   g.append("text")
-    .attr("x", japanTextX)
-    .attr("y", japanTextY)
+    .attr("x", (japanMinX + japanMaxX) / 2)
+    .attr("y", japanY - 15)
     .attr("text-anchor", "middle")
     .attr("fill", "green")
     .attr("font-size", "13px")
     .attr("font-weight", "bold")
     .text("Japanese brands mostly in low-mid price range");
 
-  const germanTextX = x("bmw");
-  const germanTextY = y(8000);
-
   g.append("text")
-    .attr("x", germanTextX)
-    .attr("y", germanTextY)
+    .attr("x", (japanMinX + japanMaxX) / 2)
+    .attr("y", japanY)
+    .attr("dy", "-2px")
+    .attr("text-anchor", "middle")
+    .attr("fill", "green")
+    .attr("font-size", "12px")
+    .text("Honda < Nissan < Toyota");
+
+  // === German Horizontal Annotation (TEXT BELOW LINE) ===
+  const germanBrands = data.filter(d => d.country === "Germany");
+  const germanY = y(7000);
+
+  g.selectAll(".german-line")
+    .data(germanBrands)
+    .enter()
+    .append("line")
+    .attr("x1", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("y1", d => y(d.avgPrice))
+    .attr("x2", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("y2", germanY)
+    .attr("stroke", "red")
+    .attr("stroke-width", 1)
+    .attr("stroke-dasharray", "4 2")
+    .attr("stroke-opacity", 0.6);
+
+  const germanMinX = d3.min(germanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
+  const germanMaxX = d3.max(germanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
+
+  g.append("line")
+    .attr("x1", germanMinX)
+    .attr("x2", germanMaxX)
+    .attr("y1", germanY)
+    .attr("y2", germanY)
+    .attr("stroke", "red")
+    .attr("stroke-width", 1.2)
+    .attr("stroke-opacity", 0.6);
+
+  // ✅ 아래쪽에 텍스트 배치
+  g.append("text")
+    .attr("x", (germanMinX + germanMaxX) / 2)
+    .attr("y", germanY + 18)
     .attr("text-anchor", "middle")
     .attr("fill", "red")
     .attr("font-size", "13px")
     .attr("font-weight", "bold")
     .text("German brands span a wide range but tend to be higher priced");
 
-  const japanPoints = data.filter(d => d.country === "Japan");
-  g.selectAll(".japan-line")
-    .data(japanPoints)
-    .enter()
-    .append("line")
-    .attr("class", "japan-line")
-    .attr("x1", d => x(d.manufacturer) + x.bandwidth() / 2)
-    .attr("y1", d => y(d.avgPrice))
-    .attr("x2", japanTextX)
-    .attr("y2", japanTextY)
-    .attr("stroke", "green")
-    .attr("stroke-width", 1)
-    .attr("stroke-opacity", 0.4);
+  g.append("text")
+    .attr("x", (germanMinX + germanMaxX) / 2)
+    .attr("y", germanY + 34)
+    .attr("text-anchor", "middle")
+    .attr("fill", "red")
+    .attr("font-size", "12px")
+    .text("BMW < Mercedes < Audi");
 
-  const germanPoints = data.filter(d => d.country === "Germany");
-  g.selectAll(".german-line")
-    .data(germanPoints)
+  // === Brand-specific labels below dots ===
+  const specialLabels = [
+    { brand: "honda", color: "green" },
+    { brand: "nissan", color: "green" },
+    { brand: "toyota", color: "green" },
+    { brand: "bmw", color: "red" },
+    { brand: "mercedes-benz", color: "red" },
+    { brand: "audi", color: "red" }
+  ];
+
+  g.selectAll(".special-label")
+    .data(data.filter(d => specialLabels.map(l => l.brand).includes(d.manufacturer.toLowerCase())))
     .enter()
-    .append("line")
-    .attr("class", "german-line")
-    .attr("x1", d => x(d.manufacturer) + x.bandwidth() / 2)
-    .attr("y1", d => y(d.avgPrice))
-    .attr("x2", germanTextX)
-    .attr("y2", germanTextY)
-    .attr("stroke", "red")
-    .attr("stroke-width", 1)
-    .attr("stroke-opacity", 0.4);
+    .append("text")
+    .attr("class", "special-label")
+    .attr("x", d => x(d.manufacturer) + x.bandwidth() / 2)
+    .attr("y", d => y(d.avgPrice) + radius(d.count) + 14)  // 점 아래 여백
+    .attr("text-anchor", "middle")
+    .attr("font-size", "11px")
+    .attr("fill", d => {
+      const label = specialLabels.find(l => l.brand === d.manufacturer.toLowerCase());
+      return label ? label.color : "black";
+    })
+    .text(d => d.manufacturer.charAt(0).toUpperCase() + d.manufacturer.slice(1));
+
 }
+
+
+
+
+
+
+
+
 
 
 
