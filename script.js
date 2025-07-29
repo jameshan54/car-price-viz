@@ -122,6 +122,7 @@ function drawScene1() {
       tooltip.transition().style("opacity", 1);
       tooltip.html(`<strong>${d.manufacturer}</strong><br>Avg. Price: $${d3.format(",.0f")(d.avgPrice)}<br>Listings: ${d.count}<br>Country: ${d.country}`);
       g.selectAll("circle").attr("opacity", c => c.country === d.country ? 1 : 0.1);
+      d3.selectAll(".annotation").style("display", "none"); // 🔥 주석 숨김
     })
     .on("mousemove", event => {
       tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
@@ -129,9 +130,11 @@ function drawScene1() {
     .on("mouseout", () => {
       tooltip.transition().style("opacity", 0);
       g.selectAll("circle").attr("opacity", 0.8);
+      if (activeCountry === null) {
+        d3.selectAll(".annotation").style("display", "block"); // 🔥 주석 다시 보임
+      }
     });
 
-  // === Legend ===
   const legendBoxWidth = 140;
   const legendBoxHeight = color.domain().length * 25 + 30;
   const legendX = width + margin.left + 10;
@@ -157,6 +160,7 @@ function drawScene1() {
 
   const legend = svg.append("g")
     .attr("transform", `translate(${legendX + 10}, ${legendY + 30})`);
+
   let activeCountry = null;
   let brandLabels;
 
@@ -184,16 +188,18 @@ function drawScene1() {
     if (activeCountry === country) {
       activeCountry = null;
       dots.attr("opacity", 0.8);
+      d3.selectAll(".annotation").style("display", "block"); // 🔥 다시 주석 보임
       if (brandLabels) brandLabels.remove();
     } else {
       activeCountry = country;
       dots.attr("opacity", d => d.country === country ? 1 : 0.1);
+      d3.selectAll(".annotation").style("display", "none"); // 🔥 주석 숨김
       if (brandLabels) brandLabels.remove();
       brandLabels = g.selectAll(".brand-label")
         .data(data.filter(d => d.country === country))
         .enter()
         .append("text")
-        .attr("class", "brand-label")
+        .attr("class", "brand-label annotation")  // 🔥 브랜드명도 주석
         .attr("x", d => x(d.manufacturer) + x.bandwidth() / 2 + 8)
         .attr("y", d => y(d.avgPrice) + 12)
         .attr("text-anchor", "start")
@@ -203,27 +209,28 @@ function drawScene1() {
     }
   }
 
-  // === Japan Horizontal Annotation ===
+  // === JAPAN Annotation ===
   const japanBrands = data.filter(d => d.country === "Japan");
   const japanY = y(27000);
+  const japanMinX = d3.min(japanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
+  const japanMaxX = d3.max(japanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
 
   g.selectAll(".japan-line")
     .data(japanBrands)
     .enter()
     .append("line")
+    .attr("class", "annotation")
     .attr("x1", d => x(d.manufacturer) + x.bandwidth() / 2)
     .attr("y1", d => y(d.avgPrice))
     .attr("x2", d => x(d.manufacturer) + x.bandwidth() / 2)
     .attr("y2", japanY)
     .attr("stroke", "green")
-    .attr("stroke-width", 1)
     .attr("stroke-dasharray", "4 2")
+    .attr("stroke-width", 1)
     .attr("stroke-opacity", 0.6);
 
-  const japanMinX = d3.min(japanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
-  const japanMaxX = d3.max(japanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
-
   g.append("line")
+    .attr("class", "annotation")
     .attr("x1", japanMinX)
     .attr("x2", japanMaxX)
     .attr("y1", japanY)
@@ -233,6 +240,7 @@ function drawScene1() {
     .attr("stroke-opacity", 0.6);
 
   g.append("text")
+    .attr("class", "annotation")
     .attr("x", (japanMinX + japanMaxX) / 2)
     .attr("y", japanY - 15)
     .attr("text-anchor", "middle")
@@ -242,6 +250,7 @@ function drawScene1() {
     .text("Japanese brands mostly in low-mid price range");
 
   g.append("text")
+    .attr("class", "annotation")
     .attr("x", (japanMinX + japanMaxX) / 2)
     .attr("y", japanY)
     .attr("dy", "-2px")
@@ -250,27 +259,28 @@ function drawScene1() {
     .attr("font-size", "12px")
     .text("Honda < Nissan < Toyota");
 
-  // === German Horizontal Annotation (TEXT BELOW LINE) ===
+  // === GERMANY Annotation ===
   const germanBrands = data.filter(d => d.country === "Germany");
   const germanY = y(7000);
+  const germanMinX = d3.min(germanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
+  const germanMaxX = d3.max(germanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
 
   g.selectAll(".german-line")
     .data(germanBrands)
     .enter()
     .append("line")
+    .attr("class", "annotation")
     .attr("x1", d => x(d.manufacturer) + x.bandwidth() / 2)
     .attr("y1", d => y(d.avgPrice))
     .attr("x2", d => x(d.manufacturer) + x.bandwidth() / 2)
     .attr("y2", germanY)
     .attr("stroke", "red")
-    .attr("stroke-width", 1)
     .attr("stroke-dasharray", "4 2")
+    .attr("stroke-width", 1)
     .attr("stroke-opacity", 0.6);
 
-  const germanMinX = d3.min(germanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
-  const germanMaxX = d3.max(germanBrands, d => x(d.manufacturer) + x.bandwidth() / 2);
-
   g.append("line")
+    .attr("class", "annotation")
     .attr("x1", germanMinX)
     .attr("x2", germanMaxX)
     .attr("y1", germanY)
@@ -279,8 +289,8 @@ function drawScene1() {
     .attr("stroke-width", 1.2)
     .attr("stroke-opacity", 0.6);
 
-  // ✅ 아래쪽에 텍스트 배치
   g.append("text")
+    .attr("class", "annotation")
     .attr("x", (germanMinX + germanMaxX) / 2)
     .attr("y", germanY + 18)
     .attr("text-anchor", "middle")
@@ -290,6 +300,7 @@ function drawScene1() {
     .text("German brands span a wide range but tend to be higher priced");
 
   g.append("text")
+    .attr("class", "annotation")
     .attr("x", (germanMinX + germanMaxX) / 2)
     .attr("y", germanY + 34)
     .attr("text-anchor", "middle")
@@ -297,7 +308,7 @@ function drawScene1() {
     .attr("font-size", "12px")
     .text("BMW < Mercedes < Audi");
 
-  // === Brand-specific labels below dots ===
+  // === Brand name labels below dots ===
   const specialLabels = [
     { brand: "honda", color: "green" },
     { brand: "nissan", color: "green" },
@@ -311,9 +322,9 @@ function drawScene1() {
     .data(data.filter(d => specialLabels.map(l => l.brand).includes(d.manufacturer.toLowerCase())))
     .enter()
     .append("text")
-    .attr("class", "special-label")
+    .attr("class", "annotation")
     .attr("x", d => x(d.manufacturer) + x.bandwidth() / 2)
-    .attr("y", d => y(d.avgPrice) + radius(d.count) + 14)  // 점 아래 여백
+    .attr("y", d => y(d.avgPrice) + radius(d.count) + 14)
     .attr("text-anchor", "middle")
     .attr("font-size", "11px")
     .attr("fill", d => {
@@ -321,8 +332,8 @@ function drawScene1() {
       return label ? label.color : "black";
     })
     .text(d => d.manufacturer.charAt(0).toUpperCase() + d.manufacturer.slice(1));
-
 }
+
 
 
 
