@@ -1,3 +1,4 @@
 ## Demo
-
-<img src="./Animation.gif" width="600">
+<p align="center">
+  <img src="./Animation.gif" width="600">
+</p>
