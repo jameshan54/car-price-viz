@@ -1,2 +1,2 @@
-data/*.csv filter=lfs diff=lfs merge=lfs -text
+data/used_cars.csv filter=lfs diff=lfs merge=lfs -text
 data/*.zip filter=lfs diff=lfs merge=lfs -text
